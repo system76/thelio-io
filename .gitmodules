@@ -1,0 +1,9 @@
+[submodule "output"]
+	path = output
+	url = https://github.com/system76/thelio-io-output.git
+[submodule "firmware"]
+	path = firmware
+	url = https://github.com/system76/thelio-io-firmware.git
+[submodule "hardware"]
+	path = hardware
+	url = https://github.com/system76/thelio-io-hardware.git
