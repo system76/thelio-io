@@ -7,3 +7,6 @@
 [submodule "hardware"]
 	path = hardware
 	url = https://github.com/system76/thelio-io-hardware.git
+[submodule "dkms"]
+	path = dkms
+	url = https://github.com/pop-os/system76-io-dkms.git
