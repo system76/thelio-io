@@ -15,6 +15,6 @@ output/hardware: FORCE
 	mkdir -p "$@"
 	make -C "hardware" clean
 	make -C "hardware" all
-	cp "hardware/build/"* "$@"
+	cp "hardware/"*-bom.csv "hardware/build/"* "$@"
 
 FORCE:
