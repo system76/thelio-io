@@ -10,6 +10,3 @@
 [submodule "dkms"]
 	path = dkms
 	url = https://github.com/pop-os/system76-io-dkms.git
-[submodule "test"]
-	path = test
-	url = https://github.com/system76/thelio-io-test.git
