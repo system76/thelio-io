@@ -68,26 +68,25 @@ fi
 
 for device in "${devices[@]}"
 do
-	fan=2
+	for fan in 1 2
+	do
+		label="$(cat "$device"/hwmon/hwmon*/fan"$fan"_label)"
+		pwm="$(cat "$device"/hwmon/hwmon*/pwm"$fan")"
+		rpm="$(cat "$device"/hwmon/hwmon*/fan"$fan"_input)"
 
-	label="$(cat "$device"/hwmon/hwmon*/fan"$fan"_label)"
-	pwm="$(cat "$device"/hwmon/hwmon*/pwm"$fan")"
-	rpm="$(cat "$device"/hwmon/hwmon*/fan"$fan"_input)"
+		echo "$label: $pwm PWM, $rpm RPM"
 
-	echo "$label: $pwm PWM, $rpm RPM"
+		if [ "$pwm" != "$expected_pwm" ]
+		then
+			fail "expected $expected_pwm pwm but found $pwm pwm"
+		fi
 
-	if [ "$pwm" != "$expected_pwm" ]
-	then
-		fail "expected $expected_pwm pwm but found $pwm pwm"
-	fi
-
-	if [ "$(echo "$rpm<$expected_rpm" | bc -l)" == "1" ]
-	then
-		fail "expected $expected_rpm rpm but found $rpm rpm"
-	fi
+		if [ "$(echo "$rpm<$expected_rpm" | bc -l)" == "1" ]
+		then
+			fail "expected $expected_rpm rpm but found $rpm rpm"
+		fi
+	done
 done
 
 echo -e "\x1B[1;32mPASS\x1B[0m"
 exit 0
-
-
