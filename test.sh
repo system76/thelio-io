@@ -3,6 +3,7 @@
 expected_drives=4
 expected_speed=512
 expected_devices=1
+set_pwm=126
 expected_pwm=127
 expected_rpm=600
 
@@ -70,7 +71,7 @@ for device in "${devices[@]}"
 do
 	for fan in 1 2
 	do
-		echo "$expected_pwm" | sudo tee "$device"/hwmon/hwmon*/pwm"$fan" > /dev/null
+		echo "$set_pwm" | sudo tee "$device"/hwmon/hwmon*/pwm"$fan" > /dev/null
 		sleep 1
 
 		label="$(cat "$device"/hwmon/hwmon*/fan"$fan"_label)"
