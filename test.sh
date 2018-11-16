@@ -37,7 +37,7 @@ done
 
 for pid in "${pids[@]}"
 do
-	wait "$pid"
+	wait "$pid" || fail "failed to test disk performance"
 done
 
 for name in "${names[@]}"
