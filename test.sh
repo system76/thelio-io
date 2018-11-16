@@ -70,6 +70,9 @@ for device in "${devices[@]}"
 do
 	for fan in 1 2
 	do
+		echo "$expected_pwm" | sudo tee "$device"/hwmon/hwmon*/pwm"$fan" > /dev/null
+		sleep 1
+
 		label="$(cat "$device"/hwmon/hwmon*/fan"$fan"_label)"
 		pwm="$(cat "$device"/hwmon/hwmon*/pwm"$fan")"
 		rpm="$(cat "$device"/hwmon/hwmon*/fan"$fan"_input)"
