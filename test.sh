@@ -15,8 +15,17 @@ test="tmp/$(date "+%Y-%m-%d_%H:%M:%S")"
 rm -rf tmp
 mkdir -p "$test"
 
-sudo avrdude -p atmega32u4 -c usbasp -U flash:w:output/firmware/thelio-io.hex:i || fail "failed to flash"
-sudo avrdude -p atmega32u4 -c usbasp -U efuse:w:0xCB:m -U hfuse:w:0xD8:m -U lfuse:w:0xFF:m || fail "failed to set fuses"
+sudo avrdude \
+	-c usbasp \
+	-p atmega32u4 \
+	-U flash:w:output/firmware/boot.hex:i\
+	-U lfuse:w:0xFF:m \
+	-U hfuse:w:0xD9:m \
+	-U efuse:w:0xCB:m \
+	|| fail "failed to flash bootloader"
+sleep 2
+sudo dfu-programmer atmega32u4 flash output/firmware/main.hex || fail "failed to flash program"
+sudo dfu-programmer atmega32u4 reset || fail "failed to start program"
 
 drives=(/dev/disk/by-path/pci-????:??:??.?-ata-?)
 echo "drives: ${#drives[@]}"
