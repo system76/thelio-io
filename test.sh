@@ -17,6 +17,7 @@ rm -rf tmp
 mkdir -p "$test"
 
 gsettings set org.gnome.settings-daemon.plugins.power button-power suspend
+gsettings set org.gnome.settings-daemon.plugins.power power-button-action suspend
 gsettings set org.gnome.desktop.lockdown disable-lock-screen true
 
 sudo avrdude \
