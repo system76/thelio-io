@@ -16,6 +16,9 @@ test="tmp/$(date "+%Y-%m-%d_%H:%M:%S")"
 rm -rf tmp
 mkdir -p "$test"
 
+gsettings set org.gnome.settings-daemon.plugins.power button-power suspend
+gsettings set org.gnome.desktop.lockdown disable-lock-screen true
+
 sudo avrdude \
 	-c usbasp \
 	-p atmega32u4 \
