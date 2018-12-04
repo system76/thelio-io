@@ -3,8 +3,8 @@
 expected_drives=4
 expected_speed=512
 expected_devices=1
-set_pwm=126
-expected_pwm=127
+set_pwm=127
+expected_pwm=126
 expected_rpm=600
 
 function fail {
