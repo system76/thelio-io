@@ -75,8 +75,11 @@ for device in "${devices[@]}"
 do
 	for fan in 1 2
 	do
-		echo "$set_pwm" | sudo tee "$device"/hwmon/hwmon*/pwm"$fan" > /dev/null
-		sleep 1
+		for attempt in {1..10}
+		do
+			echo "$set_pwm" | sudo tee "$device"/hwmon/hwmon*/pwm"$fan" > /dev/null
+			sleep 0.2
+		done
 
 		label="$(cat "$device"/hwmon/hwmon*/fan"$fan"_label)"
 		pwm="$(cat "$device"/hwmon/hwmon*/pwm"$fan")"
