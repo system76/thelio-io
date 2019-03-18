@@ -5,7 +5,7 @@ expected_speed=512
 expected_devices=1
 set_pwm=127
 expected_pwm=126
-expected_rpm=600
+expected_rpm=300
 
 function fail {
 	echo -e "\x1B[1;31mFAIL: $@\x1B[0m"
