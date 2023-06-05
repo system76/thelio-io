@@ -1,3 +1,6 @@
 [submodule "hardware"]
 	path = hardware
 	url = https://github.com/system76/thelio-io-hardware.git
+[submodule "firmware"]
+	path = firmware
+	url = https://github.com/system76/qmk_firmware.git
