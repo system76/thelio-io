@@ -1,12 +1,6 @@
-[submodule "output"]
-	path = output
-	url = https://github.com/system76/thelio-io-output.git
-[submodule "firmware"]
-	path = firmware
-	url = https://github.com/system76/thelio-io-firmware.git
 [submodule "hardware"]
 	path = hardware
 	url = https://github.com/system76/thelio-io-hardware.git
-[submodule "dkms"]
-	path = dkms
-	url = https://github.com/pop-os/system76-io-dkms.git
+[submodule "firmware"]
+	path = firmware
+	url = https://github.com/system76/qmk_firmware.git
