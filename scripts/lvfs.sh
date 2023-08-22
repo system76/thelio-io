@@ -73,7 +73,7 @@ cp "firmware/.build/system76_${MODEL}_default.uf2" "${BUILD}/firmware.uf2"
 echo "writing '${BUILD}/firmware.metainfo.xml'"
 cat > "${BUILD}/firmware.metainfo.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Copyright 2022 System76 <info@system76.com> -->
+<!-- Copyright 2023 System76 <info@system76.com> -->
 <component type="firmware">
   <id>com.system76.${MODEL}.firmware</id>
   <name>Thelio Io</name>
