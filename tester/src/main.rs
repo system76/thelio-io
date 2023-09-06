@@ -1,4 +1,4 @@
-use ectool::{Access, AccessHid, Ec, Error};
+use ectool::{Access, AccessHid, Ec, Error, SecurityState};
 use hidapi::HidApi;
 use proc_mounts::MountIter;
 use std::{
@@ -11,6 +11,8 @@ use termion::{color, style};
 
 const EXPECTED_BOARD: &str = "system76/thelio_io_2";
 const EXPECTED_VERSION: &str = "0.21.0-65-g0c3e4c";
+const EXPECTED_PWM: u8 = 127;
+const MINIMUM_RPM: u16 = 300;
 
 fn find_mount_by_dev(dev: &Path) -> Result<Option<PathBuf>, Error> {
     for info_res in MountIter::new()? {
@@ -22,33 +24,138 @@ fn find_mount_by_dev(dev: &Path) -> Result<Option<PathBuf>, Error> {
     Ok(None)
 }
 
-fn tester() -> Result<(), String> {
-    let mut bootloaders = Vec::new();
-    for block in
-        Block::all().map_err(|err| format!("failed to discover block devices: {:?}", err))?
-    {
-        let parent = match block.parent_device() {
-            Some(some) => some,
-            None => continue,
-        };
+fn remove_module() -> Result<(), String> {
+    let module = "system76_thelio_io";
+    println!("Blocking module {}", module);
+    fs::write(
+        "/etc/modprobe.d/thelio-io-tester.conf",
+        format!("blacklist {}", module),
+    )
+    .map_err(|err| format!("failed to block module {}: {:?}", module, err))?;
 
-        let vendor = match parent.device_vendor() {
-            Ok(ok) => ok.trim().to_string(),
-            Err(_) => continue,
-        };
+    if Path::new("/sys/module").join(module).exists() {
+        println!("Removing module {}", module);
+        let status = process::Command::new("modprobe")
+            .arg("--remove")
+            .arg(module)
+            .status()
+            .map_err(|err| format!("failed to run modprobe: {:?}", err))?;
+        if !status.success() {
+            return Err(format!("failed to remove module {}: {:?}", module, status));
+        }
+    }
 
-        let model = match parent.device_model() {
-            Ok(ok) => ok.trim().to_string(),
-            Err(_) => continue,
-        };
+    Ok(())
+}
 
-        let dev = match (vendor.as_str(), model.as_str()) {
-            ("RPI", "RP2") => Path::new("/dev").join(block.id()),
+fn reset_bootloader() -> Result<(), String> {
+    let mut ecs = Vec::new();
+    let api = HidApi::new().map_err(|err| format!("failed to access HID API: {:?}", err))?;
+    for info in api.device_list() {
+        #[allow(clippy::single_match)]
+        match (info.vendor_id(), info.product_id(), info.interface_number()) {
+            // System76 thelio_io_2
+            (0x3384, 0x000B, 1) => {
+                let device = info
+                    .open_device(&api)
+                    .map_err(|err| format!("failed to open EC: {:?}", err))?;
+                let access = AccessHid::new(device, 10, 100)
+                    .map_err(|err| format!("failed to access EC: {:?}", err))?;
+                ecs.push(unsafe {
+                    Ec::new(access).map_err(|err| format!("failed to probe EC: {:?}", err))?
+                });
+            }
             _ => continue,
-        };
+        }
+    }
 
-        println!("Found RP2040 bootloader at {}", dev.display());
-        bootloaders.push(dev);
+    let attempts = 60;
+    for attempt in 1..=attempts {
+        let mut unlocked = 0;
+        for ec in &mut ecs {
+            let security_state = unsafe {
+                ec.security_get()
+                    .map_err(|err| format!("failed to get EC security state: {:?}", err))?
+            };
+
+            match security_state {
+                SecurityState::Lock | SecurityState::PrepareLock => {
+                    unsafe {
+                        ec.security_set(SecurityState::PrepareUnlock)
+                            .map_err(|err| format!("failed to prepare to unlock EC: {:?}", err))?
+                    };
+                }
+                SecurityState::Unlock => {
+                    unlocked += 1;
+                }
+                SecurityState::PrepareUnlock => (),
+            }
+        }
+
+        if unlocked == ecs.len() {
+            break;
+        }
+
+        println!(
+            "{}PRESS POWER BUTTON TO UNLOCK{} ({}/{})",
+            style::Bold,
+            style::Reset,
+            attempt,
+            attempts
+        );
+        thread::sleep(time::Duration::new(1, 0));
+    }
+
+    for ec in &mut ecs {
+        println!("Resetting EC");
+        unsafe {
+            ec.reset()
+                .map_err(|err| format!("failed to reset EC: {:?}", err))?
+        };
+    }
+
+    Ok(())
+}
+
+fn flash_firmware() -> Result<(), String> {
+    let mut bootloaders = Vec::new();
+    let attempts = 30;
+    for attempt in 1..=attempts {
+        for block in
+            Block::all().map_err(|err| format!("failed to discover block devices: {:?}", err))?
+        {
+            let parent = match block.parent_device() {
+                Some(some) => some,
+                None => continue,
+            };
+
+            let vendor = match parent.device_vendor() {
+                Ok(ok) => ok.trim().to_string(),
+                Err(_) => continue,
+            };
+
+            let model = match parent.device_model() {
+                Ok(ok) => ok.trim().to_string(),
+                Err(_) => continue,
+            };
+
+            let dev = match (vendor.as_str(), model.as_str()) {
+                ("RPI", "RP2") => Path::new("/dev").join(block.id()),
+                _ => continue,
+            };
+
+            bootloaders.push(dev);
+        }
+
+        if bootloaders.is_empty() {
+            println!(
+                "Waiting for RP2040 to reset to bootloader ({}/{})",
+                attempt, attempts
+            );
+            thread::sleep(time::Duration::new(1, 0));
+        } else {
+            break;
+        }
     }
 
     if bootloaders.len() != 1 {
@@ -59,6 +166,9 @@ fn tester() -> Result<(), String> {
     }
 
     for dev in bootloaders {
+        println!("Found RP2040 bootloader at {}", dev.display());
+
+        thread::sleep(time::Duration::new(1, 0)); //hack to ensure the device is mounted
         let mut mount_opt = find_mount_by_dev(&dev).map_err(|err| {
             format!(
                 "failed to find mount point for {}: {:?}",
@@ -101,8 +211,18 @@ fn tester() -> Result<(), String> {
         .map_err(|err| format!("failed to write firmware: {:?}", err))?;
     }
 
+    Ok(())
+}
+
+fn tester() -> Result<(), String> {
+    remove_module()?;
+
+    reset_bootloader()?;
+
+    flash_firmware()?;
+
     let mut ecs = Vec::new();
-    let attempts = 10;
+    let attempts = 30;
     for attempt in 1..=attempts {
         let api = HidApi::new().map_err(|err| format!("failed to access HID API: {:?}", err))?;
         for info in api.device_list() {
@@ -124,7 +244,10 @@ fn tester() -> Result<(), String> {
         }
 
         if ecs.is_empty() {
-            println!("Waiting for RP2040 to reset ({}/{})", attempt, attempts);
+            println!(
+                "Waiting for RP2040 to reset to runtime ({}/{})",
+                attempt, attempts
+            );
             thread::sleep(time::Duration::new(1, 0))
         } else {
             break;
@@ -177,7 +300,40 @@ fn tester() -> Result<(), String> {
             board, version
         );
 
-        for fan in 0..=4 {}
+        for fan in 0..4 {
+            println!("Testing fan {} with PWM {}", fan, EXPECTED_PWM);
+
+            unsafe {
+                ec.fan_set(fan, EXPECTED_PWM)
+                    .map_err(|err| format!("failed to set fan {} PWM: {:?}", fan, err))?;
+            };
+
+            thread::sleep(time::Duration::new(1, 0));
+
+            let pwm = unsafe {
+                ec.fan_get(fan)
+                    .map_err(|err| format!("failed to read fan {} PWM: {:?}", fan, err))?
+            };
+            if pwm != EXPECTED_PWM {
+                return Err(format!(
+                    "fan {} had PWM {}, expected {}",
+                    fan, pwm, EXPECTED_PWM
+                ));
+            }
+
+            let rpm = unsafe {
+                ec.fan_tach(fan)
+                    .map_err(|err| format!("failed to read fan {} RPM: {:?}", fan, err))?
+            };
+
+            println!("Fan {} running at {} RPM", fan, rpm);
+            if rpm < MINIMUM_RPM {
+                return Err(format!(
+                    "fan {} had RPM {}, expected at least {}",
+                    fan, rpm, MINIMUM_RPM
+                ));
+            }
+        }
     }
 
     Ok(())
