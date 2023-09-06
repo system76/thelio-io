@@ -13,6 +13,36 @@ const EXPECTED_BOARD: &str = "system76/thelio_io_2";
 const EXPECTED_VERSION: &str = "0.21.0-65-g0c3e4c";
 const EXPECTED_PWM: u8 = 127;
 const MINIMUM_RPM: u16 = 300;
+const MODULE: &str = "system76_thelio_io";
+
+fn block_module() -> Result<(), String> {
+    println!("Blocking module {}", MODULE);
+    fs::write(
+        "/etc/modprobe.d/thelio-io-tester.conf",
+        format!("blacklist {}", MODULE),
+    )
+    .map_err(|err| format!("failed to block module {}: {:?}", MODULE, err))?;
+
+    if Path::new("/sys/module").join(MODULE).exists() {
+        println!("Removing module {}", MODULE);
+        let status = process::Command::new("modprobe")
+            .arg("--remove")
+            .arg(MODULE)
+            .status()
+            .map_err(|err| format!("failed to run modprobe: {:?}", err))?;
+        if !status.success() {
+            return Err(format!("failed to remove module {}: {:?}", MODULE, status));
+        }
+    }
+
+    Ok(())
+}
+
+fn allow_module() -> Result<(), String> {
+    println!("Allowing module {}", MODULE);
+    fs::remove_file("/etc/modprobe.d/thelio-io-tester.conf")
+        .map_err(|err| format!("failed to allow module {}: {:?}", MODULE, err))
+}
 
 fn find_mount_by_dev(dev: &Path) -> Result<Option<PathBuf>, Error> {
     for info_res in MountIter::new()? {
@@ -22,30 +52,6 @@ fn find_mount_by_dev(dev: &Path) -> Result<Option<PathBuf>, Error> {
         }
     }
     Ok(None)
-}
-
-fn remove_module() -> Result<(), String> {
-    let module = "system76_thelio_io";
-    println!("Blocking module {}", module);
-    fs::write(
-        "/etc/modprobe.d/thelio-io-tester.conf",
-        format!("blacklist {}", module),
-    )
-    .map_err(|err| format!("failed to block module {}: {:?}", module, err))?;
-
-    if Path::new("/sys/module").join(module).exists() {
-        println!("Removing module {}", module);
-        let status = process::Command::new("modprobe")
-            .arg("--remove")
-            .arg(module)
-            .status()
-            .map_err(|err| format!("failed to run modprobe: {:?}", err))?;
-        if !status.success() {
-            return Err(format!("failed to remove module {}: {:?}", module, status));
-        }
-    }
-
-    Ok(())
 }
 
 fn reset_bootloader() -> Result<(), String> {
@@ -215,8 +221,6 @@ fn flash_firmware() -> Result<(), String> {
 }
 
 fn tester() -> Result<(), String> {
-    remove_module()?;
-
     reset_bootloader()?;
 
     flash_firmware()?;
@@ -339,8 +343,18 @@ fn tester() -> Result<(), String> {
     Ok(())
 }
 
+fn tester_with_blocked_module() -> Result<(), String> {
+    block_module()?;
+
+    let res = tester();
+
+    allow_module()?;
+
+    res
+}
+
 fn main() {
-    match tester() {
+    match tester_with_blocked_module() {
         Ok(()) => {
             eprintln!(
                 "{}{}PASS{}{}",
