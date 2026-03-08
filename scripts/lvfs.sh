@@ -22,6 +22,7 @@ case "${MODEL}" in
     "thelio_io_2")
         BOOTLOADER_PID="0003" # RP2040
         RUNTIME_PID="000B"
+        RUNTIME_REV="0001"
         ;;
     *)
         echo "$0: unknown model '${MODEL}'" >&2
@@ -38,7 +39,7 @@ echo "BOOTLOADER_ID: ${BOOTLOADER_ID}"
 BOOTLOADER_UUID="$(appstream-util generate-guid "${BOOTLOADER_ID}")"
 echo "BOOTLOADER_UUID: ${BOOTLOADER_UUID}"
 
-RUNTIME_ID="USB\\VID_${RUNTIME_VID}&PID_${RUNTIME_PID}"
+RUNTIME_ID="USB\\VID_${RUNTIME_VID}&PID_${RUNTIME_PID}&REV_${RUNTIME_REV}"
 echo "RUNTIME_ID: ${RUNTIME_ID}"
 
 RUNTIME_UUID="$(appstream-util generate-guid "${RUNTIME_ID}")"
